@@ -62,7 +62,7 @@ use std::{
 };
 
 pub use notify;
-use notify::{Error, Event, RecommendedWatcher, Watcher};
+use notify::{Error, Event, EventKind, RecommendedWatcher, Watcher};
 
 /// The set of requirements for watcher debounce event handling functions.
 ///
@@ -172,14 +172,16 @@ struct EventData {
     insert: Instant,
     /// Last Update
     update: Instant,
+    kind: EventKind,
 }
 
 impl EventData {
     #[inline(always)]
-    fn new_any(time: Instant) -> Self {
+    fn new_any(time: Instant, kind: EventKind) -> Self {
         Self {
             insert: time,
             update: time,
+            kind: kind,
         }
     }
 }
@@ -326,7 +328,8 @@ impl DebounceDataInner {
             if let Some(v) = self.event_map.get_mut(&path) {
                 v.update = time;
             } else {
-                self.event_map.insert(path, EventData::new_any(time));
+                self.event_map
+                    .insert(path, EventData::new_any(time, event.kind));
             }
         }
     }
