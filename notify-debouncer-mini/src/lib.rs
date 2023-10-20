@@ -62,10 +62,7 @@ use std::{
 };
 
 pub use notify;
-use notify::{
-    event::{CreateKind, ModifyKind, RemoveKind},
-    Error, Event, EventKind, RecommendedWatcher, Watcher,
-};
+use notify::{Error, Event, EventKind, RecommendedWatcher, Watcher};
 
 /// The set of requirements for watcher debounce event handling functions.
 ///
@@ -311,11 +308,11 @@ impl DebounceDataInner {
                     EventKind::Other => kind = DebouncedEventKind::Other,
                 }
 
-                log::trace!("debounced event: {:?}", kind);
+                // log::trace!("debounced event: {:?}", kind);
 
                 events_expired.push(DebouncedEvent::new(path, kind));
             } else if event.insert.elapsed() >= self.timeout {
-                log::trace!("debounced event: {:?}", DebouncedEventKind::AnyContinuous);
+                // log::trace!("debounced event: {:?}", DebouncedEventKind::AnyContinuous);
                 // set a new deadline, otherwise an 'AnyContinuous' will never resolve to a final 'Any' event
                 Self::check_deadline(
                     self.batch_mode,
@@ -366,7 +363,7 @@ impl DebounceDataInner {
     /// Add new event to debouncer cache
     #[inline(always)]
     fn add_event(&mut self, event: Event) {
-        log::trace!("raw event: {event:?}");
+        // log::trace!("raw event: {event:?}");
         let time = Instant::now();
         if self.debounce_deadline.is_none() {
             self.debounce_deadline = Some(time + self.timeout);
