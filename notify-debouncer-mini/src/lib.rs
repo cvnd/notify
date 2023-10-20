@@ -62,7 +62,10 @@ use std::{
 };
 
 pub use notify;
-use notify::{Error, Event, EventKind, RecommendedWatcher, Watcher};
+use notify::{
+    event::{CreateKind, ModifyKind, RemoveKind},
+    Error, Event, EventKind, RecommendedWatcher, Watcher,
+};
 
 /// The set of requirements for watcher debounce event handling functions.
 ///
@@ -196,8 +199,41 @@ pub type DebounceEventResult = Result<Vec<DebouncedEvent>, Error>;
 #[non_exhaustive]
 pub enum DebouncedEventKind {
     /// No precise events
-    EventKind(EventKind),
+    Any,
+
+    /// An event describing non-mutating access operations on files.
+    ///
+    /// This event is about opening and closing file handles, as well as executing files, and any
+    /// other such event that is about accessing files, folders, or other structures rather than
+    /// mutating them.
+    ///
+    /// Only some platforms are capable of generating these.
+    Access,
+
+    /// An event describing creation operations on files.
+    ///
+    /// This event is about the creation of files, folders, or other structures but not about e.g.
+    /// writing new content into them.
+    Create,
+
+    /// An event describing mutation of content, name, or metadata.
+    ///
+    /// This event is about the mutation of files', folders', or other structures' content, name
+    /// (path), or associated metadata (attributes).
+    Modify,
+
+    /// An event describing removal operations on files.
+    ///
+    /// This event is about the removal of files, folders, or other structures but not e.g. erasing
+    /// content from them. This may also be triggered for renames/moves that move files _out of the
+    /// watched subpath_.
+    ///
+    /// Some editors also trigger Remove events when saving files as they may opt for removing (or
+    /// renaming) the original then creating a new file in-place.
+    Remove,
+
     /// Event but debounce timed out (for example continuous writes)
+    Other,
     AnyContinuous,
 }
 
@@ -265,14 +301,19 @@ impl DebounceDataInner {
         self.debounce_deadline = None;
         for (path, event) in self.event_map.drain() {
             if event.update.elapsed() >= self.timeout {
-                log::trace!(
-                    "debounced event: {:?}",
-                    DebouncedEventKind::EventKind(event.kind)
-                );
-                events_expired.push(DebouncedEvent::new(
-                    path,
-                    DebouncedEventKind::EventKind(event.kind),
-                ));
+                let kind;
+                match event.kind {
+                    EventKind::Access(_) => kind = DebouncedEventKind::Access,
+                    EventKind::Create(_) => kind = DebouncedEventKind::Create,
+                    EventKind::Remove(_) => kind = DebouncedEventKind::Remove,
+                    EventKind::Modify(_) => kind = DebouncedEventKind::Modify,
+                    EventKind::Any => kind = DebouncedEventKind::Any,
+                    EventKind::Other => kind = DebouncedEventKind::Other,
+                }
+
+                log::trace!("debounced event: {:?}", kind);
+
+                events_expired.push(DebouncedEvent::new(path, kind));
             } else if event.insert.elapsed() >= self.timeout {
                 log::trace!("debounced event: {:?}", DebouncedEventKind::AnyContinuous);
                 // set a new deadline, otherwise an 'AnyContinuous' will never resolve to a final 'Any' event
