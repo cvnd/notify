@@ -181,7 +181,7 @@ impl EventData {
         Self {
             insert: time,
             update: time,
-            kind: kind,
+            kind,
         }
     }
 }
@@ -196,7 +196,7 @@ pub type DebounceEventResult = Result<Vec<DebouncedEvent>, Error>;
 #[non_exhaustive]
 pub enum DebouncedEventKind {
     /// No precise events
-    Any,
+    EventKind(EventKind),
     /// Event but debounce timed out (for example continuous writes)
     AnyContinuous,
 }
@@ -265,8 +265,14 @@ impl DebounceDataInner {
         self.debounce_deadline = None;
         for (path, event) in self.event_map.drain() {
             if event.update.elapsed() >= self.timeout {
-                log::trace!("debounced event: {:?}", DebouncedEventKind::Any);
-                events_expired.push(DebouncedEvent::new(path, DebouncedEventKind::Any));
+                log::trace!(
+                    "debounced event: {:?}",
+                    DebouncedEventKind::EventKind(event.kind)
+                );
+                events_expired.push(DebouncedEvent::new(
+                    path,
+                    DebouncedEventKind::EventKind(event.kind),
+                ));
             } else if event.insert.elapsed() >= self.timeout {
                 log::trace!("debounced event: {:?}", DebouncedEventKind::AnyContinuous);
                 // set a new deadline, otherwise an 'AnyContinuous' will never resolve to a final 'Any' event
